@@ -1,0 +1,52 @@
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+class Timer {
+    long startTime;
+    long totalTime; // Total accumulated time in nanoseconds
+    ScheduledExecutorService scheduler;
+
+
+    public Timer() { 
+        this.scheduler = Executors.newScheduledThreadPool(1);
+        this.totalTime = 0;
+    }
+
+    public void setTotalTime(int time) {this.totalTime = time;}
+
+    public void startTimer() {
+        this.startTime = System.nanoTime();
+        scheduler.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS);
+    }
+
+    // Stop the timer and accumulate the elapsed time in nanoseconds
+    public void stopTimer() {
+        if (scheduler != null) {
+            scheduler.shutdown();
+        }
+        long endTime = System.nanoTime();
+        totalTime += (endTime - startTime); // Accumulate the time spent on this turn
+        System.out.println("Time spent this turn: " + ((endTime - startTime) / 1_000_000_000.0) + " seconds");
+    }
+
+    // Get the total time accumulated by the player
+    public double getTotalTimeInSeconds() {
+        return totalTime / 1_000_000_000.0; // Convert nanoseconds to seconds
+    }
+
+    // Create a Runnable task to display time left or other information
+    Runnable task = new Runnable() {
+        @Override
+        public void run() {
+            long currentTime = System.nanoTime();
+            long timeFromBeginning = currentTime - startTime;
+            System.out.println("Time running: " + (timeFromBeginning / 1_000_000_000.0) + " seconds");
+        }
+    };
+
+    // Reset the timer to zero (optional, based on your use case)
+    public void resetTimer() {
+        totalTime = 0;
+    }
+}

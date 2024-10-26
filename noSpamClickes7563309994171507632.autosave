@@ -1,0 +1,577 @@
+import java.util.Arrays;  
+import java.io.*;
+
+Board b = new Board();
+
+Point validClickedIndex = new Point(-1,-1); // (3,5)
+Point validCenter = new Point(-1,-1); // (350,550)
+
+Point tempCoords = new Point(-1,-1); 
+Point tempIndex = new Point(-1,-1);
+Point tempCenter = new Point(-1,-1);
+Point tempMoved = new Point(-1,-1); 
+
+boolean clickedOnCircle = false;
+boolean onWhite = false; 
+boolean onBlack = false;
+boolean mustEat = false;
+boolean outOfBounds = false;
+boolean gameStarted = false;
+
+
+boolean takeBackMenu = false;
+boolean timerMenu = false;
+boolean InGameMenu = false;
+
+int turnCounter = 1;
+int winner = 0;
+int selectedOption = -1;
+
+
+
+String statePlayer = "nothing";
+
+
+
+boolean mouseClicked = false;
+
+String[] timerOptions = {"1 min", "5 min", "10 min", "Unlimited"};
+String[] takeBackOptions = {"1 move", "3 moves","5 moves", "Unlimited"};
+
+Button[] timerButtons = new Button[timerOptions.length];
+Button[] takeBackButtons = new Button[takeBackOptions.length];
+
+
+
+Button start = new Button();
+Button pause = new Button();
+Button takeBack = new Button();
+Button timer = new Button();
+
+
+TextFile f;
+
+public void setup() {
+  size(1000 ,1000, P2D);
+  start = new Button((width / 10) * 4, (width / 10) * 4, (width / 10), (width / 10) * 2,255,255,255, "Start");
+  frameRate(30);
+  f = new TextFile("");
+}
+
+public void draw() {
+  int offsetX = 200;
+  int offsetY = 200;
+  int sizeBoard = width - offsetX;
+  int sizeSquare = sizeBoard / 8 ;
+  
+  if(!gameStarted){
+
+    drawStartMenu(width); // drawing the menu according to the screen size
+
+      if (mouseClicked){ // check where we clicked 
+        if(clickedButton(start)){      
+          gameStarted = true;
+        }
+
+        if(clickedButton(timer)){
+          for (int i = 0; i < timerOptions.length; i++) {
+          timerButtons[i] = new Button(timer.getX(), timer.getY() + timer.getHeight() + (i * timer.getHeight()),
+                                     timer.getHeight(), timer.getWidth(),255,255,255, timerOptions[i]);
+          }
+          timerMenu = !timerMenu;
+        }
+/*
+        if(clickedButton(takeBack)){
+          for (int i = 0; i < takeBackOptions.length; i++) {
+          takeBackButtons[i] = new Button(takeBack.getX(), takeBack.getY() + takeBack.getHeight() + (i * takeBack.getHeight()),
+                                     takeBack.getHeight(), takeBack.getWidth(),255,255,255, takeBackOptions[i]);
+          }
+          takeBackMenu = !takeBackMenu;
+        }
+*/
+        if(timerMenu){
+          dropDownMenu(timerButtons, selectedOption, timerMenu);
+        }
+      }
+
+      if(timerMenu){
+          drawTimerMenu(sizeBoard);
+      }
+
+      if (selectedOption != -1) {
+        fill(0);
+        textAlign(CENTER);
+        text("Selected: " + timerOptions[selectedOption], width / 2, height - 30);
+      }
+
+      
+
+    }
+
+
+
+
+  else if(InGameMenu) {
+      // if clicked on resume game -> InGameMenu = false
+  }
+
+  else{
+    drawBoardScreen(sizeSquare ,sizeBoard, offsetX, offsetY);
+    int middleX; int middleY;
+
+    float radius = sizeSquare * 0.65f;
+
+    if(turnCounter % 2 == 1)
+    { // white turn
+      
+      if(mouseClicked){
+        
+      if (!outOfBounds && onWhite){   // ERROR WHEN CLICKING ON PIECE AND THEN ON OUTOFBOUNDS
+        tempCoords.setX(mouseX);
+        tempCoords.setY(mouseY);
+        tempCenter = tempCoords.transferToMiddleCords(sizeBoard);
+        tempIndex = tempCenter.transferToSquareCords(sizeBoard);
+        
+        if(b.isMoveValid( validClickedIndex.getX(),validClickedIndex.getY(),tempIndex.getX(),tempIndex.getY(), mustEat ,turnCounter)){ 
+          b.makeMove(validClickedIndex.getX(),validClickedIndex.getY(),tempIndex.getX(),tempIndex.getY());
+
+          if(tempIndex.getY() == 0)
+            b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] = 'W';
+
+          f.addText("White Moved from ", turnCounter, validClickedIndex, tempIndex);
+          turnCounter++;
+          
+          statePlayer = "nothing";
+          validClickedIndex.resetPoint();
+          validCenter.resetPoint();
+          // clickedOnCircle = false;
+        
+        }
+        
+        else{
+
+          if(b.canMakeCapture(validClickedIndex.getX(),validClickedIndex.getY(),tempIndex.getX(),tempIndex.getY(), turnCounter)){
+            
+            b.makeEat(validClickedIndex.getX(),validClickedIndex.getY() ,tempIndex.getX() ,tempIndex.getY());
+            statePlayer = "moved";
+            
+            if(tempIndex.getY() == 0)
+              b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] = 'W';
+
+            f.addText("White captured from ", turnCounter, validClickedIndex, tempIndex);
+
+
+            if(b.canEat(tempIndex.getX() ,tempIndex.getY(), turnCounter)){
+              mustEat = true;
+              tempMoved.setX(tempIndex.getX());
+              tempMoved.setY(tempIndex.getY());
+
+            }
+            
+            else{
+              tempMoved.resetPoint();
+              mustEat = false;
+              turnCounter++;
+              validClickedIndex.resetPoint();
+              validCenter.resetPoint();
+              statePlayer = "nothing";
+              // clickedOnCircle = false;
+            }
+
+          }
+        }
+
+        
+      }
+      
+
+      if(mouseX >= sizeBoard || mouseY >= sizeBoard){
+        outOfBounds = true;
+        if(clickedButton(pause)){
+          exit();
+
+
+          // opens in game menu
+
+        }
+      }
+
+      else{
+        outOfBounds = false;
+        tempCoords.setX(mouseX);
+        tempCoords.setY(mouseY);
+        tempIndex = tempCoords.transferToSquareCords(sizeBoard);
+        tempCenter = tempCoords.transferToMiddleCords(sizeBoard);
+        double distance = tempCoords.distance(tempCenter);
+
+        clickedOnCircle = radius / 2 >= distance;
+
+        if (!outOfBounds && clickedOnCircle && (b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] == 'w' ||
+           b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] == 'W')){ // if clicked inside the circle and on white piece
+
+        
+          if(mustEat){
+            if(tempMoved.getX() == tempIndex.getX() && tempMoved.getY() == tempIndex.getY())
+            { // if its on eating streak so only if i select the piece that currently is on the streak the click will count as a correct one 
+              validCenter.setX(tempCenter.getX());
+              validCenter.setY(tempCenter.getY());
+              validClickedIndex.setX(tempIndex.getX());
+              validClickedIndex.setY(tempIndex.getY());
+              statePlayer = "selected";
+              onWhite = true; 
+            }
+
+          }
+
+          else{
+
+            if(turnCounter % 2 == 1){
+
+              validCenter.setX(tempCenter.getX());
+              validCenter.setY(tempCenter.getY());
+              validClickedIndex.setX(tempIndex.getX());
+              validClickedIndex.setY(tempIndex.getY());
+              statePlayer = "selected";
+              onWhite = true; 
+            }
+
+          }
+      
+        }
+        else{
+        onWhite = false;
+        validClickedIndex.resetPoint();
+        statePlayer = "nothing";
+       //clickedOnCircle = false;
+        }
+
+      }
+
+    
+            
+    }
+    
+    } // end of white turn      
+    else{     // black turn (BOT)
+      if(mouseClicked){
+      if (!outOfBounds && onBlack){   // ERROR WHEN CLICKING ON PIECE AND THEN ON OUTOFBOUNDS
+        tempCoords.setX(mouseX);
+        tempCoords.setY(mouseY);
+        tempCenter = tempCoords.transferToMiddleCords(sizeBoard);
+        tempIndex = tempCenter.transferToSquareCords(sizeBoard);
+
+        if(b.isMoveValid( validClickedIndex.getX(),validClickedIndex.getY(),tempIndex.getX(),tempIndex.getY(), mustEat, turnCounter)){ 
+          b.makeMove(validClickedIndex.getX(),validClickedIndex.getY(),tempIndex.getX(),tempIndex.getY());
+
+          if(tempIndex.getY() == 7)
+              b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] = 'B';
+          
+          
+          f.addText("Black Moved from ", turnCounter, validClickedIndex, tempIndex);
+
+          
+          turnCounter++; 
+          statePlayer = "nothing";
+          validClickedIndex.resetPoint();
+          validCenter.resetPoint();
+          // clickedOnCircle = false;
+          
+        }
+        
+        else{
+          if(b.canMakeCapture(validClickedIndex.getX(),validClickedIndex.getY(),tempIndex.getX(),tempIndex.getY(), turnCounter)){
+            
+            b.makeEat(validClickedIndex.getX(),validClickedIndex.getY() ,tempIndex.getX() ,tempIndex.getY());
+            statePlayer = "moved";
+            if(tempIndex.getY() == 7)
+              b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] = 'B';
+              
+
+
+            f.addText("Black captured from ", turnCounter, validClickedIndex, tempIndex);
+            
+            if(b.canEat(tempIndex.getX(),tempIndex.getY(), turnCounter))
+            { // if black can eat again
+              mustEat = true;
+              tempMoved.setX(tempIndex.getX());
+              tempMoved.setY(tempIndex.getY());
+            }
+            
+            else
+            {
+              mustEat = false;
+              tempMoved.resetPoint();
+              turnCounter++;
+              statePlayer = "nothing";
+              validClickedIndex.resetPoint();
+              validCenter.resetPoint();
+              // clickedOnCircle = false;
+            }
+          }
+        }
+        
+      }
+      
+
+      if(mouseX >= sizeBoard || mouseY >= sizeBoard){
+        outOfBounds = true;
+        if(clickedButton(pause)){
+          exit();
+        }
+      }
+      else{
+        outOfBounds = false;
+        tempCoords.setX(mouseX);
+        tempCoords.setY(mouseY);
+        tempIndex = tempCoords.transferToSquareCords(sizeBoard);
+        tempCenter = tempCoords.transferToMiddleCords(sizeBoard);
+        double distance = tempCoords.distance(tempCenter);
+        clickedOnCircle = radius / 2 >= distance;
+      
+
+        if (clickedOnCircle && (b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] == 'b' ||
+            b.positionsOnBoard[tempIndex.getY()][tempIndex.getX()] == 'B')){ // (clicked on the piece and the piece is black)
+
+          if(mustEat){
+            if(tempMoved.getX() == tempIndex.getX() && tempMoved.getY() == tempIndex.getY())
+            { // if on eating streak and the piece is the same piece that previously ate
+              validCenter.setX(tempCenter.getX());
+              validCenter.setY(tempCenter.getY());
+              validClickedIndex.setX(tempIndex.getX());
+              validClickedIndex.setY(tempIndex.getY());
+              statePlayer = "selected";
+              onBlack = true; 
+            }
+
+          }
+        
+          else
+          {
+            if(turnCounter % 2 == 0){
+              validCenter.setX(tempCenter.getX());
+              validCenter.setY(tempCenter.getY());
+              validClickedIndex.setX(tempIndex.getX());
+              validClickedIndex.setY(tempIndex.getY());
+              statePlayer = "selected";
+              onBlack = true; 
+            }
+
+          }
+        
+       
+        }
+        else{
+        onBlack = false; 
+        validClickedIndex.resetPoint();
+        statePlayer = "nothing";
+       //clickedOnCircle = false;
+        }
+      }
+    
+    }
+   
+  }// end of black turn
+      
+      // drawing the circles
+
+
+  for (int i = 0; i < 8 ; i++)
+  {
+    for (int j = 0; j < 8 ; j++)
+    {
+      middleX = (j * sizeSquare) + sizeSquare / 2; // can crate another function
+      middleY = (i * sizeSquare) + sizeSquare / 2;
+      if (b.positionsOnBoard[i][j] == 'b'){
+        fill(0);
+        circle(middleX , middleY , radius); // drawing black circle
+      }
+
+      else if(b.positionsOnBoard[i][j] == 'B'){ // black queen
+        fill(0);
+        stroke(255,255,0);
+        strokeWeight(6); 
+        circle(middleX , middleY , radius); // drawing circle
+        noStroke();
+      }
+      
+      else if (b.positionsOnBoard[i][j] == 'w'){
+        fill(255);
+        circle(middleX , middleY , radius); // drawing white circle
+      }
+
+      else if(b.positionsOnBoard[i][j] == 'W'){ // white queen
+        fill(255);
+        stroke(255,255,0);
+        strokeWeight(6); 
+        circle(middleX , middleY , radius); // drawing circle
+        noStroke();
+      }
+
+      if(validClickedIndex.getX() >= 0 && validClickedIndex.getY() >= 0) 
+      {
+        if (b.positionsOnBoard[validClickedIndex.getY()][validClickedIndex.getX()] != ' ' && statePlayer.equals("selected") || statePlayer.equals("moved")){ // check if there is currently white circle on position
+          fill(255, 0, 0); // red
+          circle(validClickedIndex.getX() * sizeSquare + sizeSquare / 2 , validClickedIndex.getY() * sizeSquare + sizeSquare / 2 , radius / 3); // drawing red circle
+        }
+
+      }
+      
+    }
+  }
+  
+  if(turnCounter == 100){
+    f.close(); 
+  }
+  } // end of main code
+
+  mouseClicked = false;
+} // end of draw func
+
+// ---------------------------------------------util functions-----------------------------------------------------------
+
+  public void checkWinner(Board b, int winner, int turnCounter){
+    
+    boolean black = false;
+    boolean white = false;
+
+    for (int i = 0; i < 8; i++){
+      for (int j = 0; j < 8; j++){
+        if(b.positionsOnBoard[i][j] == 'b' || b.positionsOnBoard[i][j] == 'B'){
+          black = true;
+        }
+        if(b.positionsOnBoard[i][j] == 'w' || b.positionsOnBoard[i][j] == 'W'){
+          white = true;
+        }
+
+      }
+    }
+
+    if(!black || !white){
+      
+      if(turnCounter % 2 == 0){
+
+        // white wins(black turn)
+
+      }
+      else{
+        // black wins(white turn)
+      }
+      // draw winning screen
+
+    }
+
+  }
+
+  public void drawBoardScreen(int sizeSquare, int sizeBoard, int offsetX, int offsetY){
+    background(0,0,255); //   aquamarine
+    fill(177,110,65); // brow
+    square(0, 0,sizeBoard);
+    fill(240,200,140); // white
+    noStroke();
+    boolean changed = false; // if we changed the square to white
+    for (int i = 0; i < width - offsetX ; i+= sizeSquare){
+      for (int j = 0; j < height  - offsetY; j+= sizeSquare){
+    
+        if (!changed){
+          square(i , j , sizeSquare);
+          if(j != sizeSquare * 7){
+            changed = true;
+          }
+        }
+        
+        else{
+          if (j != sizeSquare * 7){
+            changed = !changed;
+          }
+        }
+      }
+    }
+    pause = new Button((int)(8.375*sizeSquare),(int)(3.5*sizeSquare),(int)(1.25*sizeSquare),(int)(1.25*sizeSquare), 0,0,0,"");
+    drawButton(pause);
+    fill(255);
+    rect((int)(8.64*sizeSquare), (int)(3.75*sizeSquare), (int)(0.225*sizeSquare), (int)(0.75*sizeSquare));
+    rect((int)(9.13*sizeSquare), (int)(3.75*sizeSquare), (int)(0.225*sizeSquare), (int)(0.75*sizeSquare)); // pause button
+  }
+
+////////////////
+
+  public void drawTimerMenu(int sizeBoard){
+
+
+
+    for (int j = 0; j < timerOptions.length; j++) {
+      drawButton(timerButtons[j]);
+    }
+  }
+
+////////////////////////
+
+  public void drawStartMenu(int sizeBoard){
+    stroke(0);              // Black outline
+    strokeWeight(5);         // Thicker outline
+    background(240,200,140); 
+    fill(177,110,65);
+
+    rect(0, 0, sizeBoard, sizeBoard / 6); // top rect
+    fill(255,255,255);
+    drawButton(start);
+    
+    
+    textSize(90);
+    text("CHECKERS", sizeBoard / 2, sizeBoard /12);
+    textSize(40);
+
+    takeBack = new Button((int)((sizeBoard / 10)*6) , (int)((sizeBoard / 10)*5.5) ,sizeBoard / 12 ,sizeBoard / 4, 255,255,255,"Take-back");
+    timer = new Button((int)((sizeBoard / 10)*2) , (int)((sizeBoard / 10)*5.5) ,sizeBoard / 12 ,sizeBoard / 5, 255,255,255,"Timer");
+
+
+
+    drawButton(timer);
+    drawButton(takeBack);
+
+
+
+  }
+
+
+/////////
+
+
+
+  public boolean clickedButton(Button b){
+    if(mouseX >= b.x && mouseX <= b.x + b.width &&
+       mouseY >= b.y && mouseY <= b.y + b.height){ // check if clicked on start button 
+            return true;
+    }
+    return false;
+  }
+
+
+
+/////////////
+
+public void drawButton(Button b){ 
+    fill(b.R,b.G,b.B);
+    rect(b.x, b.y, b.width, b.height);
+    
+    textAlign(CENTER, CENTER);
+    PFont boldFont = createFont("Arial Bold", (int)(b.height / 2.5));
+    textFont(boldFont);  // Set the font to be bold
+    fill(0);
+    text(b.text, b.x + b.width / 2, b.y + b.height / 2);
+
+}
+//////
+
+public void mouseClicked(){
+  mouseClicked = true;
+}
+
+public void dropDownMenu(Button[] buttons, int selectedOption, boolean Menu){
+  for (int i = 0; i < buttons.length; i++) {
+    if (clickedButton(buttons[i])) {
+      selectedOption = i;  // Record the selected option
+      Menu = false; // Hide dropdown after selection
+    }
+  }
+}
